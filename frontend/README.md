@@ -1,79 +1,44 @@
-# Dodge - AgencyOS Landing Page
-
-![Dodge Thumbnail](https://github.com/user-attachments/assets/ed6b7c90-8a71-4617-83a5-81480808ca02)
+# Graph-Based O2C Insights UX (frontend)
 
 ## 🔥 Introduction
 
-Dodge is a modern, high-performance project management web application designed to streamline workflows, manage projects, and handle invoices with an elegant and responsive design.
+This frontend is part of the DodgeAI project: a graph-based Order-to-Cash analytics app with an integrated natural language query chat.
 
-## 🔗 Live Preview
+## 🌟 Features
 
-Check out the live demo of Dodge here: [Live Preview](https://Dodge-app.vercel.app)
+- Interactive entity graph view (nodes, edges, drag/zoom)
+- Node details and expansions
+- Chat interface for business queries (backed by dataset SQL)
+- Node highlighting via NLP output (`graph_node_ids` mapping)
+- Clustering mode for entity clusters
+- Responsive layout with sidebar + graph panel
 
-## 🎥 Watch on YouTube
+## 🛠️ Tech Stack
 
-Take a look at YouTube video by watching the demo: [Watch the Video](https://www.youtube.com/watch?v=8UlfQRGvAtU)
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- react-force-graph-2d
 
-## 💻 Tech Stack
+## 🚀 Local Run
 
-- **Next.js 16** – React framework for production
-- **React 19** – The library for web and native user interfaces
-- **TailwindCSS 4** – Utility-first CSS framework
-- **Shadcn UI** – Reusable components built on Radix UI
-- **Motion** – Production-ready motion library
-- **TypeScript** – Type-safe code
+1. `cd frontend`
+2. `npm install` (or `pnpm install`)
+3. copy `.env.example` to `.env.local`
+4. set backend URL if needed, e.g. `NEXT_PUBLIC_API_URL=http://localhost:8000`
+5. `npm run dev`
 
-## 🛠️ Installation
+Open [http://localhost:3000](http://localhost:3000)
 
-Clone the repository:
+## 🧩 Backend contract
 
-```bash
-git clone https://github.com/Shreyas-29/Dodge.git
-```
+- `GET /api/graph` - graph snapshot
+- `POST /api/chat` - NL query => data-backed response + graph node IDs
+- `GET /api/graph/node/{id}` - node details
+- `GET /api/graph/clusters` - clustering
 
-Install dependencies:
+## 📝 Notes
 
-```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
-
-Run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-### Environment Variables
-
-Rename `.env.example` to `.env.local` and configure:
-
-```env
-NEXT_PUBLIC_APP_NAME="Dodge"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## 🚀 Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ☕ Buy Me a Coffee
-
-If you enjoy using this project, consider supporting my work!
-
-[Buy Me a Coffee ☕](https://buymeacoffee.com/shreyas29)
+- The UI expects backend to provide structured nodes with `id`, `name`, `category`, `properties`, `neighbors`.
+- Chat bubble actions can 
