@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeft, Maximize2, Minimize2, Layers, User, X } from "lucide-react";
+import { PanelLeft, Maximize2, Minimize2, Layers, User, X, ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 type GraphNode = {
     id: string;
@@ -79,7 +80,11 @@ const Dashboard = () => {
     const [nodeDegrees, setNodeDegrees] = useState<Map<string, number>>(new Map());
     const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
     const [isGraphMinimized, setIsGraphMinimized] = useState(false);
+    const [isChatCollapsed, setIsChatCollapsed] = useState(false);
     const [hideGranularOverlay, setHideGranularOverlay] = useState(false);
+    const [isClusterMode, setIsClusterMode] = useState(false);
+    const [clusterMap, setClusterMap] = useState<Record<string, number>>({});
+    const [clusterPalette, setClusterPalette] = useState<Record<number, string>>({});
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: "init",
@@ -140,9 +145,36 @@ const Dashboard = () => {
         }, 100);
     }, []);
 
+    const loadClusters = useCallback(async () => {
+        try {
+            const resp = await fetch(`${API_BASE}/api/graph/clusters?limit=1200&min_cluster_size=4&max_clusters=30`);
+            if (!resp.ok) {
+                return;
+            }
+            const data = (await resp.json()) as {
+                clusters: Array<{ cluster_id: number; color: string }>;
+                node_cluster_map: Record<string, number>;
+            };
+            const palette: Record<number, string> = {};
+            for (const cluster of data.clusters ?? []) {
+                palette[cluster.cluster_id] = cluster.color;
+            }
+            setClusterPalette(palette);
+            setClusterMap(data.node_cluster_map ?? {});
+        } catch {
+            return;
+        }
+    }, []);
+
     useEffect(() => {
         loadGraph();
     }, [loadGraph]);
+
+    useEffect(() => {
+        if (isClusterMode) {
+            void loadClusters();
+        }
+    }, [isClusterMode, loadClusters]);
 
     const expandNode = useCallback(async (node: GraphNode) => {
         if (selectedNode?.id === node.id) {
@@ -379,11 +411,22 @@ const Dashboard = () => {
         : "flex h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-5";
 
     const mainContainerClass = "flex flex-row flex-1 overflow-hidden w-full relative";
+    const graphPanelBasis = isChatCollapsed ? "100%" : isGraphMinimized ? "40%" : "65%";
+    const chatPanelBasis = isGraphMinimized ? "60%" : "35%";
 
     return (
         <div className={shellClass}>
             <header className={topBarClass}>
                 <div className="flex items-center gap-3">
+                    <Link
+                        className={isDark
+                            ? "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[12px] font-semibold text-white hover:bg-white/10"
+                            : "rounded-md border border-gray-200 bg-white px-2 py-1 text-[12px] font-semibold text-gray-900 hover:bg-gray-50"
+                        }
+                        href="/"
+                    >
+                        Dodge
+                    </Link>
                     <PanelLeft size={18} className={isDark ? "text-gray-400" : "text-gray-500"} />
                     <div className={isDark ? "h-4 w-[1px] bg-gray-700" : "h-4 w-[1px] bg-gray-200"} />
                     <p className={isDark ? "text-[13px] font-medium text-gray-400" : "text-[13px] font-medium text-gray-400"}>
@@ -405,7 +448,7 @@ const Dashboard = () => {
             <main className={mainContainerClass}>
                 <section
                     className={isDark ? "relative flex flex-col bg-[#0a0a0a] min-w-0 overflow-hidden" : "relative flex flex-col bg-white min-w-0 overflow-hidden"}
-                    style={{ flexBasis: isGraphMinimized ? "40%" : "65%", flexGrow: 1, flexShrink: 1 }}
+                    style={{ flexBasis: graphPanelBasis, flexGrow: 1, flexShrink: 1, transition: "flex-basis 200ms ease" }}
                 >
                     {graphNotice ? (
                         <div className={isDark
@@ -426,7 +469,25 @@ const Dashboard = () => {
                             type="button"
                         >
                             {isGraphMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
-                            {isGraphMinimized ? "Restore" : "Minimize"}
+                            {isGraphMinimized ? "Restore Split" : "Focus Graph"}
+                        </button>
+                        <button
+                            className={""}
+                            onClick={() => setIsChatCollapsed((prev) => !prev)}
+                            type="button"
+                        >
+                            {isChatCollapsed ? "Open Chat" : ""}
+                        </button>
+                        <button
+                            className={isDark
+                                ? "flex items-center gap-2 rounded-lg border border-white/15 bg-black px-3.5 py-2 text-[12px] font-semibold text-white shadow-lg hover:bg-white/10 transition-colors"
+                                : "flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-[12px] font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition-colors"
+                            }
+                            onClick={() => setIsClusterMode((prev) => !prev)}
+                            type="button"
+                        >
+                            <Layers size={14} />
+                            {isClusterMode ? "Cluster: ON" : "Cluster: OFF"}
                         </button>
                         <button
                             className={isDark
@@ -440,6 +501,21 @@ const Dashboard = () => {
                             {hideGranularOverlay ? "Show Granular Overlay" : "Hide Granular Overlay"}
                         </button>
                     </div>
+
+                    {isChatCollapsed ? (
+                        <button
+                            className={isDark
+                                ? "absolute right-4 top-20 z-20 rounded-lg border border-white/15 bg-black px-3 py-2 text-[12px] font-semibold text-white hover:bg-white/10"
+                                : "absolute right-4 top-20 z-20 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12px] font-semibold text-gray-900 hover:bg-gray-50"
+                            }
+                            onClick={() => setIsChatCollapsed(false)}
+                            type="button"
+                        >
+                            <span className="inline-flex items-center gap-2">
+                                <ChevronLeft size={14} /> Open Chat
+                            </span>
+                        </button>
+                    ) : null}
 
                     <div className="h-full w-full flex-1 relative z-0 min-w-0 overflow-hidden">
                         <ForceGraph2D
@@ -474,7 +550,9 @@ const Dashboard = () => {
                                 if (isHub) {
                                     ctx.beginPath();
                                     ctx.arc(n.x || 0, n.y || 0, isDark ? 4 : 3.5, 0, 2 * Math.PI, false);
-                                    ctx.fillStyle = isDark ? "#3b82f6" : "#2563eb"; 
+                                    const clusterId = clusterMap[n.id];
+                                    const clusterColor = clusterId ? clusterPalette[clusterId] : undefined;
+                                    ctx.fillStyle = isClusterMode ? (clusterColor || (isDark ? "#93c5fd" : "#3b82f6")) : (isDark ? "#3b82f6" : "#2563eb");
                                     ctx.fill();
                                     ctx.strokeStyle = isDark ? "#000000" : "#ffffff";
                                     ctx.lineWidth = 0.5;
@@ -482,7 +560,9 @@ const Dashboard = () => {
                                 } else {
                                     ctx.beginPath();
                                     ctx.arc(n.x || 0, n.y || 0, isDark ? 1.8 : 1.2, 0, 2 * Math.PI, false);
-                                    ctx.fillStyle = isDark ? "#ef4444" : "#ef4444"; 
+                                    const clusterId = clusterMap[n.id];
+                                    const clusterColor = clusterId ? clusterPalette[clusterId] : undefined;
+                                    ctx.fillStyle = isClusterMode ? (clusterColor || (isDark ? "#a3a3a3" : "#9ca3af")) : (isDark ? "#ef4444" : "#ef4444");
                                     ctx.fill();
                                     ctx.strokeStyle = isDark ? "#000000" : "#ffffff";
                                     ctx.lineWidth = 0.3;
@@ -532,14 +612,14 @@ const Dashboard = () => {
                             <h3 className={isDark ? "text-[15px] font-bold text-white mb-4" : "text-[15px] font-bold text-gray-900 mb-4"}>
                                 {selectedNode.type}
                             </h3>
-                            <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-2 text-[12.5px] leading-5">
+                            <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[12.5px] leading-5">
                                 <div>
                                     <span className={isDark ? "text-gray-400 w-[120px] shrink-0" : "text-gray-500 w-[120px] shrink-0"}>Entity:</span>
                                 </div>
                                 <span className={isDark ? "break-words text-gray-200" : "break-words text-gray-800"}>{selectedNode.type}</span>
                                 {metadataEntries.map(([key, value]) => (
                                     <div className="contents" key={key}>
-                                        <span className={isDark ? "text-gray-400" : "text-gray-500"}>{key}:</span>
+                                        <span className={isDark ? "break-words pr-2 text-gray-400" : "break-words pr-2 text-gray-500"}>{key}:</span>
                                         <span className={isDark ? "break-all text-gray-200" : "break-all text-gray-800"}>{String(value ?? "-")}</span>
                                     </div>
                                 ))}
@@ -554,12 +634,27 @@ const Dashboard = () => {
                     ) : null}
                 </section>
 
-                <div className={isDark ? "w-[1px] shrink-0 bg-white/10" : "w-[1px] shrink-0 bg-gray-100"} />
+                {!isChatCollapsed ? <div className={isDark ? "w-[1px] shrink-0 bg-white/10" : "w-[1px] shrink-0 bg-gray-100"} /> : null}
 
-                <section className={isDark ? "flex flex-col bg-[#0a0a0a] shrink-0" : "flex flex-col bg-[#fafafa] shrink-0"} style={{ flexBasis: isGraphMinimized ? "60%" : "35%", width: isGraphMinimized ? "60%" : "35%", minWidth: "300px", maxWidth: "420px" }}>
+                {!isChatCollapsed ? (
+                <section className={isDark ? "flex flex-col bg-[#0a0a0a] shrink-0" : "flex flex-col bg-[#fafafa] shrink-0"} style={{ flexBasis: chatPanelBasis, width: chatPanelBasis, minWidth: "300px", maxWidth: "420px", transition: "flex-basis 200ms ease" }}>
                     <header className={isDark ? "border-b border-white/5 py-4 px-6 shrink-0" : "border-b border-gray-100 py-4 px-6 shrink-0"}>
-                        <h2 className={isDark ? "text-[14px] font-bold text-white" : "text-[14px] font-bold text-gray-900"}>Chat with Graph</h2>
-                        <p className={isDark ? "text-[12px] font-medium text-gray-500 mt-0.5" : "text-[12px] font-medium text-gray-500 mt-0.5"}>Order to Cash</p>
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 className={isDark ? "text-[14px] font-bold text-white" : "text-[14px] font-bold text-gray-900"}>Chat with Graph</h2>
+                                <p className={isDark ? "text-[12px] font-medium text-gray-500 mt-0.5" : "text-[12px] font-medium text-gray-500 mt-0.5"}>Order to Cash</p>
+                            </div>
+                            <button
+                                className={isDark
+                                    ? "rounded-md p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+                                    : "rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                                }
+                                onClick={() => setIsChatCollapsed(true)}
+                                type="button"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
                     </header>
 
                     <div className="flex-1 overflow-y-auto px-6 py-8 space-y-7">
@@ -662,9 +757,9 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex justify-end mt-2 pr-1">
                                         <button
-                                            className={`cursor-pointer rounded-[8px] px-5 py-2 text-[13px] font-bold text-white transition-colors disabled:cursor-not-allowed ${
+                                            className={`cursor-pointer rounded-[8px] px-5 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed ${
                                                 isDark
-                                                    ? "bg-white text-black hover:bg-gray-200 disabled:bg-white/10 disabled:text-gray-500" 
+                                                    ? "bg-white text-black hover:bg-gray-200 disabled:bg-white/10 disabled:text-gray-500"
                                                     : "bg-[#8c8c8c] hover:bg-gray-500 disabled:bg-[#d4d4d4] disabled:text-white"
                                             }`}
                                             disabled={!input.trim() || isSending}
@@ -678,6 +773,7 @@ const Dashboard = () => {
                         </form>
                     </div>
                 </section>
+                ) : null}
             </main>
         </div>
     );

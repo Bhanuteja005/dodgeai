@@ -14,7 +14,6 @@ const HomePage = () => {
         <div className="w-full min-h-dvh pt-18">
             <Background />
             <Hero />
-            <Socials />
             <Workflow />
             <Capibilities />
             <Integrations />

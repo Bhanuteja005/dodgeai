@@ -61,8 +61,8 @@ const FloatingBadge = ({ text, top, left, right, index }: { text: string; top: s
 
 const Hero = () => {
 
-    const badge = "Meet the Dodge OS";
-    const description = "Stop patching together Notion, Slack, and Excel. Dodge creates a single source of truth for your projects, clients, and cash flow";
+    const badge = "Meet the DodgeAI";
+    const description = "Unify fragmented business data across orders, deliveries, invoices, and payments into a connected graph. Explore relationships visually and query the system using natural language with data-backed answers.";
 
     return (
         <section className="relative w-full flex items-center justify-center pt-16 lg:pt-32 pb-4 overflow-hidden">
@@ -94,7 +94,7 @@ const Hero = () => {
 
                     <h1 className="text-4xl md:text-6xl font-semibold tracking-tight font-heading mt-8">
                         <Balancer>
-                            {"The OS for High".split(" ").map((word, index) => (
+                            {"Graph-Based Data Modeling".split(" ").map((word, index) => (
                                 <motion.span
                                     initial={{ filter: "blur(10px)", opacity: 0, y: 10 }}
                                     animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
@@ -106,14 +106,14 @@ const Hero = () => {
                                 </motion.span>
                             ))}
                             <br />
-                            {"Performance Agencies".split(" ").map((word, index) => (
+                            {"and Query System".split(" ").map((word, index) => (
                                 <motion.span
                                     initial={{ filter: "blur(10px)", opacity: 0, y: 10 }}
                                     animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4, delay: (4 + index) * 0.05 }}
+                                    transition={{ duration: 0.4, delay: (3 + index) * 0.05 }}
                                     className={cn(
                                         "inline-block",
-                                        word === "Performance" && "bg-linear-to-r from-primary via-blue-500 to-primary bg-size-[200%_100%] animate-[shimmer_3s_ease-in-out_infinite] text-transparent bg-clip-text"
+                                        word === "Query" && "bg-linear-to-r from-primary via-blue-500 to-primary bg-size-[200%_100%] animate-[shimmer_3s_ease-in-out_infinite] text-transparent bg-clip-text"
                                     )}
                                     key={index}
                                 >
@@ -181,10 +181,10 @@ const Hero = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="absolute inset-x-0 bottom-0 z-20 w-full h-3/4 bg-linear-to-t from-background to-background/0 from-10% pointer-events-none" />
+                 {/*    <div className="absolute inset-x-0 bottom-0 z-20 w-full h-3/4 bg-linear-to-t from-background to-background/0 from-10% pointer-events-none" />
 
                     <div className="absolute top-0 inset-x-0 w-3/5 mx-auto h-1/10 rounded-full bg-primary blur-[4rem] opacity-40 -z-10"></div>
-
+Floating badges
                     {badges.map((badge, index) => (
                         <FloatingBadge
                             key={index}
@@ -193,8 +193,8 @@ const Hero = () => {
                             left={badge.left}
                             right={badge.right}
                             index={index}
-                        />
-                    ))}
+                        /> 
+                    ))}*/}
                 </motion.div>
             </Wrapper>
         </section>
