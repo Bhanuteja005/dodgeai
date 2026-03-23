@@ -31,10 +31,15 @@ This backend handles dataset ingestion, graph storage, query translation, and ch
 
 ## How to run
 
-1. Start PostgreSQL.
+1. Start PostgreSQL (local development) or use hosted DB.
 2. Apply schema: `backend/sql/schema.sql`.
 3. Install dependencies in `backend` and run `python run.py`.
 4. Use `POST /api/ingestion/run` to ingest data.
+
+## Deployed endpoints
+
+- Frontend: https://dodgeai-one.vercel.app
+- Backend: https://dodgeai-production.up.railway.app
 
 ---
 

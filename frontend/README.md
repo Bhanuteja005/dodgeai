@@ -26,10 +26,10 @@ This frontend is part of the DodgeAI project: a graph-based Order-to-Cash analyt
 1. `cd frontend`
 2. `npm install` (or `pnpm install`)
 3. copy `.env.example` to `.env.local`
-4. set backend URL if needed, e.g. `NEXT_PUBLIC_API_URL=http://localhost:8000`
+4. set backend URL to deployed API: `NEXT_PUBLIC_API_URL=https://dodgeai-production.up.railway.app`
 5. `npm run dev`
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [https://dodgeai-one.vercel.app](https://dodgeai-one.vercel.app) (deployed app)
 
 ## 🧩 Backend contract
 
