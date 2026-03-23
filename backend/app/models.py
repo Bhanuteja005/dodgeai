@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     status: Literal["ok", "offtopic", "error"]
+    graph_node_ids: list[str] = Field(default_factory=list)
 
 
 class IngestRequest(BaseModel):

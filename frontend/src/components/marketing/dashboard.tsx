@@ -26,6 +26,7 @@ type ChatMessage = {
     id: string;
     role: "user" | "assistant";
     text: string;
+    graphNodeIds?: string[];
 };
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -59,6 +60,16 @@ const sanitizeGraph = (nodes: GraphNode[], edges: GraphEdge[]) => {
         return nodeSet.has(source) && nodeSet.has(target);
     });
     return { nodes, edges: filteredEdges };
+};
+
+const nodeChipLabel = (nodeId: string): string => {
+    const parts = nodeId.split("::");
+    if (parts.length < 2) {
+        return nodeId;
+    }
+    const entity = parts[0].replaceAll("_", " ");
+    const tail = parts.slice(1).join("/");
+    return `${entity}: ${tail}`;
 };
 
 const Dashboard = () => {
@@ -213,6 +224,81 @@ const Dashboard = () => {
         });
     }, [graphNodes, selectedNode]);
 
+    const focusNodeById = useCallback(async (nodeId: string) => {
+        const found = graphNodes.find((node) => node.id === nodeId);
+        if (found) {
+            await expandNode(found);
+            setTimeout(() => {
+                fgRef.current?.zoom?.(3, 500);
+            }, 120);
+            return;
+        }
+
+        const response = await fetch(`${API_BASE}/api/graph/node/${encodeURIComponent(nodeId)}`);
+        if (!response.ok) {
+            return;
+        }
+
+        const details = (await response.json()) as {
+            id: string;
+            type: string;
+            label: string;
+            metadata: Record<string, unknown>;
+            neighbors: GraphNode[];
+            edges: Array<{
+                source_id: string;
+                target_id: string;
+                source_type: string;
+                target_type: string;
+                relationship_label: string;
+            }>;
+        };
+
+        const primaryNode: GraphNode = {
+            id: details.id,
+            type: details.type,
+            label: details.label,
+            metadata: details.metadata,
+        };
+
+        setSelectedNode(primaryNode);
+        setGraphNodes((prev) => {
+            const byId = new Map(prev.map((existing) => [existing.id, existing]));
+            byId.set(primaryNode.id, primaryNode);
+            details.neighbors.forEach((neighbor) => {
+                if (!byId.has(neighbor.id)) {
+                    byId.set(neighbor.id, neighbor);
+                }
+            });
+            return Array.from(byId.values());
+        });
+
+        setGraphEdges((prev) => {
+            const next = [...prev];
+            const keys = new Set(prev.map(edgeKey));
+            for (const edge of details.edges) {
+                const mappedEdge: GraphEdge = {
+                    source: edge.source_id,
+                    target: edge.target_id,
+                    source_type: edge.source_type,
+                    target_type: edge.target_type,
+                    relationship_label: edge.relationship_label,
+                };
+                const key = edgeKey(mappedEdge);
+                if (!keys.has(key)) {
+                    keys.add(key);
+                    next.push(mappedEdge);
+                }
+            }
+            setNodeDegrees(calculateDegrees(next));
+            return next;
+        });
+
+        setTimeout(() => {
+            fgRef.current?.zoom?.(3, 500);
+        }, 120);
+    }, [expandNode, graphNodes]);
+
     const submitQuestion = useCallback(
         async (event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
@@ -244,15 +330,21 @@ const Dashboard = () => {
                     throw new Error("chat request failed");
                 }
 
-                const data = (await resp.json()) as { answer: string };
+                const data = (await resp.json()) as { answer: string; graph_node_ids?: string[] };
+                const mappedNodeIds = data.graph_node_ids ?? [];
                 setMessages((prev) => [
                     ...prev,
                     {
                         id: `a-${Date.now()}`,
                         role: "assistant",
                         text: data.answer,
+                        graphNodeIds: mappedNodeIds,
                     },
                 ]);
+
+                if (mappedNodeIds.length > 0) {
+                    void focusNodeById(mappedNodeIds[0]);
+                }
             } catch {
                 setMessages((prev) => [
                     ...prev,
@@ -266,7 +358,7 @@ const Dashboard = () => {
                 setIsSending(false);
             }
         },
-        [input, isSending],
+        [focusNodeById, input, isSending],
     );
 
     const metadataEntries = useMemo(() => {
@@ -518,6 +610,23 @@ const Dashboard = () => {
                                     >
                                         {message.text}
                                     </article>
+                                    {message.role === "assistant" && (message.graphNodeIds?.length ?? 0) > 0 ? (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {message.graphNodeIds?.slice(0, 6).map((nodeId) => (
+                                                <button
+                                                    className={isDark
+                                                        ? "rounded-md border border-blue-400/40 bg-blue-500/10 px-2.5 py-1 text-[11px] text-blue-200 hover:bg-blue-500/20"
+                                                        : "rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] text-blue-700 hover:bg-blue-100"
+                                                    }
+                                                    key={nodeId}
+                                                    onClick={() => void focusNodeById(nodeId)}
+                                                    type="button"
+                                                >
+                                                    Show in graph: {nodeChipLabel(nodeId)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         ))}

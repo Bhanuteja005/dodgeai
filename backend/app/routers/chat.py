@@ -24,17 +24,31 @@ def _format_preview_rows(rows: list[dict], columns: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _fallback_journal_lookup(question: str) -> str | None:
+def _unique_node_ids(node_ids: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for node_id in node_ids:
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        unique.append(node_id)
+    return unique
+
+
+def _fallback_journal_lookup(question: str) -> tuple[str | None, list[str]]:
     match = re.search(r"(?:billing\s+document|billing)\D*(\d{6,})", question, flags=re.IGNORECASE)
     if not match:
-        return None
+        return None, []
 
     billing_doc = match.group(1)
     with get_cursor() as cur:
         cur.execute(
             """
             select
+                payload ->> 'companyCode' as company_code,
+                payload ->> 'fiscalYear' as fiscal_year,
                 payload ->> 'accountingDocument' as accounting_document,
+                payload ->> 'accountingDocumentItem' as accounting_document_item,
                 payload ->> 'referenceDocument' as reference_document
             from o2c_entity_records
             where entity_type = 'journal_entry_items_accounts_receivable'
@@ -46,8 +60,20 @@ def _fallback_journal_lookup(question: str) -> str | None:
         )
         rows = cur.fetchall()
 
+    graph_node_ids: list[str] = [f"billing_document_headers::{billing_doc}"]
+    for row in rows:
+        company_code = row.get("company_code")
+        fiscal_year = row.get("fiscal_year")
+        accounting_document = row.get("accounting_document")
+        accounting_document_item = row.get("accounting_document_item")
+        if company_code and fiscal_year and accounting_document and accounting_document_item:
+            graph_node_ids.append(
+                "journal_entry_items_accounts_receivable::"
+                f"{company_code}::{fiscal_year}::{accounting_document}::{accounting_document_item}"
+            )
+
     if not rows:
-        return f"No journal entry was found linked to billing document {billing_doc}."
+        return f"No journal entry was found linked to billing document {billing_doc}.", _unique_node_ids(graph_node_ids)
 
     journal_ids = sorted(
         {
@@ -57,20 +83,32 @@ def _fallback_journal_lookup(question: str) -> str | None:
         }
     )
     if not journal_ids:
-        return f"No journal entry was found linked to billing document {billing_doc}."
+        return f"No journal entry was found linked to billing document {billing_doc}.", _unique_node_ids(graph_node_ids)
 
     if len(journal_ids) == 1:
-        return f"The journal entry linked to billing document {billing_doc} is {journal_ids[0]}."
-    return f"Billing document {billing_doc} is linked to journal entries: {', '.join(journal_ids)}."
+        return (
+            f"The journal entry linked to billing document {billing_doc} is {journal_ids[0]}.",
+            _unique_node_ids(graph_node_ids),
+        )
+    return (
+        f"Billing document {billing_doc} is linked to journal entries: {', '.join(journal_ids)}.",
+        _unique_node_ids(graph_node_ids),
+    )
 
 
-def _fallback_material_billing_lookup(question: str) -> str | None:
+def _fallback_material_billing_lookup(question: str) -> tuple[str | None, list[str]]:
     # Match common SAP material identifiers like S8907367008620 or long numeric IDs.
     material_match = re.search(r"\b([A-Za-z]\d{6,}|\d{8,})\b", question)
     if not material_match:
-        return None
+        return None, []
+
+    # Let billing-document questions flow to journal fallback.
+    if re.search(r"billing\s+document", question, flags=re.IGNORECASE):
+        return None, []
 
     material_id = material_match.group(1)
+    if material_id.isdigit() and not re.search(r"material", question, flags=re.IGNORECASE):
+        return None, []
     with get_cursor() as cur:
         cur.execute(
             """
@@ -91,8 +129,17 @@ def _fallback_material_billing_lookup(question: str) -> str | None:
         )
         item_rows = cur.fetchall()
 
+    graph_node_ids: list[str] = [f"products::{material_id}"]
+    for row in item_rows:
+        billing_doc = row.get("billing_document")
+        billing_item = row.get("billing_document_item")
+        if billing_doc:
+            graph_node_ids.append(f"billing_document_headers::{billing_doc}")
+        if billing_doc and billing_item:
+            graph_node_ids.append(f"billing_document_items::{billing_doc}::{billing_item}")
+
     if not item_rows:
-        return f"No billing item records were found for material {material_id}."
+        return f"No billing item records were found for material {material_id}.", _unique_node_ids(graph_node_ids)
 
     billing_docs = sorted(
         {
@@ -109,7 +156,10 @@ def _fallback_material_billing_lookup(question: str) -> str | None:
                 """
                 select
                     payload ->> 'referenceDocument' as billing_document,
-                    payload ->> 'accountingDocument' as accounting_document
+                    payload ->> 'companyCode' as company_code,
+                    payload ->> 'fiscalYear' as fiscal_year,
+                    payload ->> 'accountingDocument' as accounting_document,
+                    payload ->> 'accountingDocumentItem' as accounting_document_item
                 from o2c_entity_records
                 where entity_type = 'journal_entry_items_accounts_receivable'
                   and payload ->> 'referenceDocument' = any(%s)
@@ -124,6 +174,15 @@ def _fallback_material_billing_lookup(question: str) -> str | None:
             if not billing_doc or not accounting_doc:
                 continue
             journal_map.setdefault(billing_doc, []).append(accounting_doc)
+
+            company_code = row.get("company_code")
+            fiscal_year = row.get("fiscal_year")
+            accounting_item = row.get("accounting_document_item")
+            if company_code and fiscal_year and accounting_doc and accounting_item:
+                graph_node_ids.append(
+                    "journal_entry_items_accounts_receivable::"
+                    f"{company_code}::{fiscal_year}::{accounting_doc}::{accounting_item}"
+                )
 
     preview = _format_preview_rows(
         item_rows,
@@ -151,7 +210,7 @@ def _fallback_material_billing_lookup(question: str) -> str | None:
             summary.append("Related journal entries:")
             summary.extend(journal_lines)
 
-    return "\n".join(summary)
+    return "\n".join(summary), _unique_node_ids(graph_node_ids)
 
 
 def _fallback_result_summary(sql_result: str) -> str:
@@ -180,29 +239,31 @@ def query_chat(payload: ChatRequest):
         return ChatResponse(
             answer="Database connection is unavailable. Check backend DB URL and try again.",
             status="error",
+            graph_node_ids=[],
         )
 
     try:
         sql_or_signal = generate_sql(payload.message, schema_context=schema_context)
     except Exception:
-        fallback = _fallback_material_billing_lookup(payload.message)
+        fallback, node_ids = _fallback_material_billing_lookup(payload.message)
         if fallback:
-            return ChatResponse(answer=fallback, status="ok")
-        fallback = _fallback_journal_lookup(payload.message)
+            return ChatResponse(answer=fallback, status="ok", graph_node_ids=node_ids)
+        fallback, node_ids = _fallback_journal_lookup(payload.message)
         if fallback:
-            return ChatResponse(answer=fallback, status="ok")
+            return ChatResponse(answer=fallback, status="ok", graph_node_ids=node_ids)
         return ChatResponse(
             answer="Chat model is temporarily unavailable or out of quota. Please retry shortly.",
             status="error",
+            graph_node_ids=[],
         )
 
     if sql_or_signal.strip().upper() == "OFFTOPIC":
-        return ChatResponse(answer=OFFTOPIC_MESSAGE, status="offtopic")
+        return ChatResponse(answer=OFFTOPIC_MESSAGE, status="offtopic", graph_node_ids=[])
 
     try:
         safe_sql = assert_safe_select(sql_or_signal)
     except SqlGuardrailError:
-        return ChatResponse(answer=OFFTOPIC_MESSAGE, status="offtopic")
+        return ChatResponse(answer=OFFTOPIC_MESSAGE, status="offtopic", graph_node_ids=[])
 
     try:
         result = execute_select(safe_sql)
@@ -210,6 +271,7 @@ def query_chat(payload: ChatRequest):
         return ChatResponse(
             answer="I could not run that data query safely against the dataset. Try rephrasing your question.",
             status="error",
+            graph_node_ids=[],
         )
 
     try:
@@ -217,4 +279,4 @@ def query_chat(payload: ChatRequest):
     except Exception:
         answer = _fallback_result_summary(result)
 
-    return ChatResponse(answer=answer, status="ok")
+    return ChatResponse(answer=answer, status="ok", graph_node_ids=[])
