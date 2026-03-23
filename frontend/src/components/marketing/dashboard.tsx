@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeft, Maximize2, Minimize2, Layers, User, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import Icons from "../global/icons";
 
 type GraphNode = {
     id: string;
@@ -425,12 +426,14 @@ const Dashboard = () => {
                         }
                         href="/"
                     >
-                        Dodge
+                        <div className="flex items-center flex-1 lg:flex-none">
+                                <Icons.wordmark className="w-auto h-5 transition-all group-hover:drop-shadow-[0_0_8px_rgba(0,85,255,0.6)]" />
+                        </div>
                     </Link>
                     <PanelLeft size={18} className={isDark ? "text-gray-400" : "text-gray-500"} />
                     <div className={isDark ? "h-4 w-[1px] bg-gray-700" : "h-4 w-[1px] bg-gray-200"} />
                     <p className={isDark ? "text-[13px] font-medium text-gray-400" : "text-[13px] font-medium text-gray-400"}>
-                        Mapping <span className="mx-1">/</span> <span className={isDark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>Order to Cash</span>
+                        Mapping
                     </p>
                 </div>
                 <button
