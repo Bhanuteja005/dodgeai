@@ -36,3 +36,15 @@ create table if not exists graph_edges (
 create index if not exists idx_graph_edges_source on graph_edges(source_id);
 create index if not exists idx_graph_edges_target on graph_edges(target_id);
 create index if not exists idx_graph_edges_types on graph_edges(source_type, target_type);
+
+create table if not exists chat_history (
+    id bigserial primary key,
+    question text not null,
+    answer text not null,
+    status text not null,
+    strategy text not null,
+    graph_node_ids jsonb not null default '[]'::jsonb,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_chat_history_created_at on chat_history(created_at desc);
